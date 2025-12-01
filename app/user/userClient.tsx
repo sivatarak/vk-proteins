@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 
 type Product = {
   id: number;
-  label: string;
-  pricePerUnit: number;
-  unit: string;
+  label: string | null;
+  name: string;
   category: string;
+  unit: string;
+  pricePerUnit: number;
+  isActive: boolean;
 };
 
 type ToastState = {
@@ -18,11 +20,12 @@ type ToastState = {
   msg: string;
 };
 
-export default function UserPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+export default function UserClient({ products }: { products: Product[] }) {
+  
+
   const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const [loading, setLoading] = useState(true);
   const [cartCount, setCartCount] = useState(0);
+
   const [toast, setToast] = useState<ToastState>({
     show: false,
     type: "success",
@@ -36,14 +39,6 @@ export default function UserPage() {
     setTimeout(() => setToast({ show: false, type, msg: "" }), 2000);
   }
 
-  async function loadProducts() {
-    setLoading(true);
-    const res = await fetch("/api/products");
-    const data = await res.json();
-    setProducts(data);
-    setLoading(false);
-  }
-
   function loadCartCount() {
     if (typeof window === "undefined") return;
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
@@ -51,11 +46,9 @@ export default function UserPage() {
   }
 
   useEffect(() => {
-    loadProducts();
     loadCartCount();
   }, []);
 
-  // Set decimal quantity for a product
   function setDecimalQuantity(productId: number, value: number) {
     setQuantities((prev) => ({
       ...prev,
@@ -68,41 +61,39 @@ export default function UserPage() {
     return (q * product.pricePerUnit).toFixed(2);
   }
 
-  // ADD TO CART (multiple items supported)
+  // ADD TO CART (overwrite same product)
   function addToCart(product: Product) {
-  const qty = quantities[product.id] || 0.25;
+    const qty = quantities[product.id] || 0.25;
 
-  if (qty <= 0) {
-    showToast("error", "Quantity must be greater than 0");
-    return;
+    if (qty <= 0) {
+      showToast("error", "Quantity must be greater than 0");
+      return;
+    }
+
+    const item = {
+      id: product.id,
+      label: product.label ?? "",
+      price: product.pricePerUnit,
+      quantity: qty,
+      total: Number((qty * product.pricePerUnit).toFixed(2)),
+      unit: product.unit,
+      category: product.category,
+    };
+
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const index = cart.findIndex((x: any) => x.id === product.id);
+
+    if (index >= 0) {
+      cart[index] = item;
+    } else {
+      cart.push(item);
+    }
+
+    localStorage.setItem("cart", JSON.stringify(cart));
+    setCartCount(cart.length);
+
+    showToast("success", `${item.label} (${qty} kg) added to cart`);
   }
-
-  const item = {
-    id: product.id,
-    label: product.label,
-    price: product.pricePerUnit,
-    quantity: qty,
-    total: Number((qty * product.pricePerUnit).toFixed(2)),
-    unit: product.unit,
-    category: product.category,
-  };
-
-  const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-
-  // overwrite existing product instead of merging
-  const existingIndex = cart.findIndex((x: any) => x.id === product.id);
-
-  if (existingIndex >= 0) {
-    cart[existingIndex] = item;       // <-- overwrite, do NOT accumulate
-  } else {
-    cart.push(item);
-  }
-
-  localStorage.setItem("cart", JSON.stringify(cart));
-  setCartCount(cart.length);
-
-  showToast("success", `${product.label} (${qty} kg) added to cart`);
-}
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -169,122 +160,97 @@ export default function UserPage() {
           Available Products
         </h2>
 
-        {loading ? (
-          <div className="text-center text-lg text-gray-600 py-20">
-            Loading products...
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {products.map((product) => (
-              <div
-                key={product.id}
-                className="bg-white rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition"
-              >
-                {/* IMAGE */}
-                <div className="relative h-56">
-                  <img
-                    src={getCategoryImage(product.category)}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute bottom-0 left-0 w-full bg-black/40 px-4 py-3">
-                    <h3 className="text-xl font-bold text-white">
-                      {product.label}
-                    </h3>
-                  </div>
-                </div>
-
-                {/* DETAILS */}
-                <div className="p-5 space-y-4">
-                  {/* PRICE */}
-                  <div>
-                    <span className="text-4xl font-bold bg-gradient-to-r from-pink-600 to-orange-600 text-transparent bg-clip-text">
-                      ₹{product.pricePerUnit}
-                    </span>
-                    <span className="ml-2 text-gray-600">/ {product.unit}</span>
-                  </div>
-
-                  {/* NEW DECIMAL QUANTITY SELECTOR */}
-                  <div className="flex items-center gap-3 mt-2">
-                    {/* Minus */}
-                    <button
-                      onClick={() => {
-                        const current = quantities[product.id] || 0.25;
-                        const newQty = Math.max(0.25, current - 0.25);
-                        setDecimalQuantity(
-                          product.id,
-                          Number(newQty.toFixed(3))
-                        );
-                      }}
-                      className="px-3 py-2 bg-gray-200 rounded-xl text-lg font-bold text-gray-700"
-                    >
-                      –
-                    </button>
-
-                    {/* Input */}
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.25"
-                      value={quantities[product.id] || 0.25}
-                      onChange={(e) => {
-                        let value = parseFloat(e.target.value);
-                        if (!value || value < 0.25) value = 0.25;
-                        setDecimalQuantity(
-                          product.id,
-                          Number(value.toFixed(3))
-                        );
-                      }}
-                      className="w-20 text-center px-3 py-2 border-2 rounded-xl bg-gray-50 text-gray-800 font-semibold"
-                    />
-
-                    {/* Plus */}
-                    <button
-                      onClick={() => {
-                        const current = quantities[product.id] || 0.25;
-                        const newQty = current + 0.25;
-                        setDecimalQuantity(
-                          product.id,
-                          Number(newQty.toFixed(3))
-                        );
-                      }}
-                      className="px-3 py-2 bg-gray-200 rounded-xl text-lg font-bold text-gray-700"
-                    >
-                      +
-                    </button>
-
-                    <span className="font-medium text-gray-700">kg</span>
-                  </div>
-
-                  {/* TOTAL */}
-                  <div className="text-lg font-semibold text-gray-800">
-                    Total Price:
-                    <span className="text-pink-600 ml-2">
-                      ₹{getTotalPrice(product)}
-                    </span>
-                  </div>
-
-                  {/* ADD TO CART */}
-                  <button
-                    onClick={() => addToCart(product)}
-                    className="w-full bg-gradient-to-r from-pink-600 to-orange-600 text-white py-3 rounded-xl font-bold shadow hover:shadow-lg active:scale-95 transition"
-                  >
-                    Add to Cart
-                  </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {products.map((product) => (
+            <div
+              key={product.id}
+              className="bg-white rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition"
+            >
+              <div className="relative h-56">
+                <img
+                  src={getCategoryImage(product.category)}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-0 left-0 w-full bg-black/40 px-4 py-3">
+                  <h3 className="text-xl font-bold text-white">
+                    {product.label ?? ""}
+                  </h3>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
 
-        {/* TOAST */}
+              <div className="p-5 space-y-4">
+                <div>
+                  <span className="text-4xl font-bold bg-gradient-to-r from-pink-600 to-orange-600 text-transparent bg-clip-text">
+                    ₹{product.pricePerUnit}
+                  </span>
+                  <span className="ml-2 text-gray-600">/ {product.unit}</span>
+                </div>
+
+                {/* Quantity Selector */}
+                <div className="flex items-center gap-3 mt-2">
+                  <button
+                    onClick={() => {
+                      const current = quantities[product.id] || 0.25;
+                      const newQty = Math.max(0.25, current - 0.25);
+                      setDecimalQuantity(product.id, Number(newQty.toFixed(3)));
+                    }}
+                    className="px-3 py-2 bg-gray-200 rounded-xl text-lg font-bold text-gray-700"
+                  >
+                    –
+                  </button>
+
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.25"
+                    value={quantities[product.id] || 0.25}
+                    onChange={(e) => {
+                      let value = parseFloat(e.target.value);
+                      if (!value || value < 0.25) value = 0.25;
+                      setDecimalQuantity(product.id, Number(value.toFixed(3)));
+                    }}
+                    className="w-20 text-center px-3 py-2 border-2 rounded-xl bg-gray-50 text-gray-800 font-semibold"
+                  />
+
+                  <button
+                    onClick={() => {
+                      const current = quantities[product.id] || 0.25;
+                      const newQty = current + 0.25;
+                      setDecimalQuantity(product.id, Number(newQty.toFixed(3)));
+                    }}
+                    className="px-3 py-2 bg-gray-200 rounded-xl text-lg font-bold text-gray-700"
+                  >
+                    +
+                  </button>
+
+                  <span className="font-medium text-gray-700">kg</span>
+                </div>
+
+                <div className="text-lg font-semibold text-gray-800">
+                  Total Price:
+                  <span className="text-pink-600 ml-2">
+                    ₹{getTotalPrice(product)}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => addToCart(product)}
+                  className="w-full bg-gradient-to-r from-pink-600 to-orange-600 text-white py-3 rounded-xl font-bold shadow hover:shadow-lg active:scale-95 transition"
+                >
+                  Add to Cart
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {toast.show && (
           <div
-            className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg text-white flex items-center gap-2
-          ${
-            toast.type === "success"
-              ? "bg-green-600"
-              : "bg-red-600"
-          }`}
+            className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg text-white flex items-center gap-2 ${
+              toast.type === "success"
+                ? "bg-green-600"
+                : "bg-red-600"
+            }`}
           >
             <span className="font-medium text-sm">{toast.msg}</span>
           </div>

@@ -15,7 +15,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req) {
+export async function POST(req:any) {
   try {
     const data = await req.json();
 
