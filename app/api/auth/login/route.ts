@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 import { prisma } from "../../../lib/prisma";
 
 export async function POST(req: Request) {
@@ -14,7 +15,10 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ message: "Invalid username" }), { status: 400 });
     }
 
-    if (user.passwordHash !== password) {
+    // 🔥 Compare hashed password with entered password
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+
+    if (!isValid) {
       return new Response(JSON.stringify({ message: "Invalid password" }), { status: 400 });
     }
 
@@ -24,17 +28,15 @@ export async function POST(req: Request) {
       { expiresIn: "7d" }
     );
 
-    // 🔥 IMPORTANT — FIX COOKIE FOR VERCEL & MOBILE
-    (await
-      // 🔥 IMPORTANT — FIX COOKIE FOR VERCEL & MOBILE
-      cookies()).set({
+    // Set cookie (for Vercel / HTTPS)
+    (await cookies()).set({
       name: "token",
       value: token,
       httpOnly: true,
-      secure: true, // <— required on vercel https
-      sameSite: "none", // <— required on mobile
-      path: "/",        // <— allow full-app access
-      maxAge: 60 * 60 * 24 * 7 // 7 days
+      secure: true,
+      sameSite: "none",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7
     });
 
     return new Response(JSON.stringify({ success: true, role: user.role }), { status: 200 });
