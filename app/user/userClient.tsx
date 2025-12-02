@@ -21,7 +21,7 @@ type ToastState = {
 };
 
 export default function UserClient({ products }: { products: Product[] }) {
-  
+
 
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [cartCount, setCartCount] = useState(0);
@@ -114,44 +114,62 @@ export default function UserClient({ products }: { products: Product[] }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-yellow-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-yellow-50 px-3 sm:px-2">
       {/* HEADER */}
       <div className="bg-gradient-to-r from-orange-500 via-pink-500 to-yellow-500 text-white shadow-xl sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
-          <div className="flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 sm:py-6 flex justify-between items-center">
+
+          <div className="flex items-center gap-2 sm:gap-3">
             <img
               src="/Vk_protein_logo.jpg"
-              className="w-14 h-14 bg-white rounded-2xl object-cover shadow-md border-2 border-white"
+              className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl object-cover shadow-md border"
             />
+
             <div>
-              <h1 className="text-2xl font-bold">VK Proteins</h1>
-              <p className="text-sm opacity-90">Fresh & Quality Products</p>
+              <h1 className="hidden sm:block text-2xl font-bold">VK Proteins</h1>
+
+              {/* Smaller text on mobile */}
+              <h1 className="sm:hidden text-base font-semibold leading-tight text-center w-full">
+                Fresh & Quality <br />
+                Products
+              </h1>
+
+
+              <p className="hidden sm:block text-sm opacity-90">
+                Fresh & Quality Products
+              </p>
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3">
             <button
               onClick={() => router.push("/cart")}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl border border-white/30 shadow"
+              className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-4 sm:py-2 
+                   bg-white/20 hover:bg-white/30 rounded-lg sm:rounded-xl 
+                   border border-white/30 shadow text-xs sm:text-sm"
             >
-              <ShoppingCart className="w-5 h-5" />
+              <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>Cart</span>
               {cartCount > 0 && (
-                <span className="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                <span className="ml-1 bg-red-500 text-white text-[10px] sm:text-xs px-1.5 py-[1px] rounded-full">
                   {cartCount}
                 </span>
               )}
             </button>
+
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl border border-white/30 shadow"
+              className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-4 sm:py-2 
+                   bg-white/20 hover:bg-white/30 rounded-lg sm:rounded-xl 
+                   border border-white/30 shadow text-xs sm:text-sm"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>Logout</span>
             </button>
           </div>
         </div>
       </div>
+
 
       {/* MAIN */}
       <div className="max-w-7xl mx-auto px-6 py-10">
@@ -187,11 +205,20 @@ export default function UserClient({ products }: { products: Product[] }) {
                 </div>
 
                 {/* Quantity Selector */}
+                {/* Quantity Selector */}
                 <div className="flex items-center gap-3 mt-2">
+                  {/* Minus Button */}
                   <button
                     onClick={() => {
-                      const current = quantities[product.id] || 0.25;
-                      const newQty = Math.max(0.25, current - 0.25);
+                      const current = quantities[product.id] ?? 0.25;
+                      let newQty = current;
+
+                      // Free-hand: Step size only for + / -
+                      if (product.unit === "kg") newQty -= 0.25;
+                      else newQty -= 1;
+
+                      if (newQty < 0) newQty = 0;
+
                       setDecimalQuantity(product.id, Number(newQty.toFixed(3)));
                     }}
                     className="px-3 py-2 bg-gray-200 rounded-xl text-lg font-bold text-gray-700"
@@ -199,23 +226,33 @@ export default function UserClient({ products }: { products: Product[] }) {
                     –
                   </button>
 
+                  {/* Free-Hand Dynamic Input */}
                   <input
                     type="number"
-                    step="0.01"
-                    min="0.25"
-                    value={quantities[product.id] || 0.25}
+                    step="0.001"
+                    min="0"
+                    value={quantities[product.id] ?? 0.25}
                     onChange={(e) => {
                       let value = parseFloat(e.target.value);
-                      if (!value || value < 0.25) value = 0.25;
+
+                      // If empty or invalid → default to 0
+                      if (isNaN(value) || value < 0) value = 0;
+
                       setDecimalQuantity(product.id, Number(value.toFixed(3)));
                     }}
-                    className="w-20 text-center px-3 py-2 border-2 rounded-xl bg-gray-50 text-gray-800 font-semibold"
+                    className="w-24 text-center px-3 py-2 border-2 rounded-xl bg-gray-50 text-gray-800 font-semibold"
                   />
 
+                  {/* Plus Button */}
                   <button
                     onClick={() => {
-                      const current = quantities[product.id] || 0.25;
-                      const newQty = current + 0.25;
+                      const current = quantities[product.id] ?? 0.25;
+                      let newQty = current;
+
+                      // Free-hand: Step size only for + / -
+                      if (product.unit === "kg") newQty += 0.25;
+                      else newQty += 1;
+
                       setDecimalQuantity(product.id, Number(newQty.toFixed(3)));
                     }}
                     className="px-3 py-2 bg-gray-200 rounded-xl text-lg font-bold text-gray-700"
@@ -223,8 +260,11 @@ export default function UserClient({ products }: { products: Product[] }) {
                     +
                   </button>
 
-                  <span className="font-medium text-gray-700">kg</span>
+                  <span className="font-medium text-gray-700">
+                    {product.unit === "kg" ? "kg" : "pcs"}
+                  </span>
                 </div>
+
 
                 <div className="text-lg font-semibold text-gray-800">
                   Total Price:
@@ -246,11 +286,10 @@ export default function UserClient({ products }: { products: Product[] }) {
 
         {toast.show && (
           <div
-            className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg text-white flex items-center gap-2 ${
-              toast.type === "success"
-                ? "bg-green-600"
-                : "bg-red-600"
-            }`}
+            className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg text-white flex items-center gap-2 ${toast.type === "success"
+              ? "bg-green-600"
+              : "bg-red-600"
+              }`}
           >
             <span className="font-medium text-sm">{toast.msg}</span>
           </div>

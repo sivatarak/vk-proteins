@@ -181,7 +181,7 @@ export default function AdminClient({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-yellow-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-yellow-50 px-3 sm:px-6">
 
       {/* HEADER */}
       <div className="bg-gradient-to-r from-pink-600 via-orange-500 to-yellow-500 shadow-xl sticky top-0 z-40">
@@ -214,21 +214,22 @@ export default function AdminClient({
           <h2 className="text-3xl font-bold mb-6 flex items-center gap-2">
             <Plus className="w-8 h-8 text-pink-600" /> Add Product
           </h2>
-
           <form
             onSubmit={createProduct}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
           >
+            {/* LABEL */}
             <input
-              className="px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl"
+              className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl"
               placeholder="Product Label"
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
               required
             />
 
+            {/* CATEGORY */}
             <select
-              className="px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl"
+              className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl"
               value={form.category}
               onChange={(e) => {
                 if (e.target.value === "add_new") {
@@ -246,8 +247,9 @@ export default function AdminClient({
               <option value="add_new">➕ Add New Category</option>
             </select>
 
+            {/* UNIT */}
             <select
-              className="px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl"
+              className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-2xl"
               value={form.unit}
               onChange={(e) => setForm({ ...form, unit: e.target.value })}
             >
@@ -255,7 +257,8 @@ export default function AdminClient({
               <option value="piece">Per Piece</option>
             </select>
 
-            <div className="flex items-center gap-3">
+            {/* PRICE + ADD BUTTON (Mobile fixed) */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full">
               <input
                 type="number"
                 step="0.01"
@@ -265,14 +268,16 @@ export default function AdminClient({
                 onChange={(e) => setForm({ ...form, pricePerUnit: e.target.value })}
                 required
               />
+
               <button
                 type="submit"
-                className="bg-gradient-to-r from-pink-600 to-orange-600 text-white px-6 py-3 rounded-2xl font-bold"
+                className="px-6 py-3 bg-gradient-to-r from-pink-600 to-orange-600 text-white rounded-2xl font-bold w-full sm:w-auto"
               >
                 Add
               </button>
             </div>
           </form>
+
         </div>
 
         {/* PRODUCT GRID */}
@@ -325,7 +330,7 @@ export default function AdminClient({
 
                 <input
                   className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-200 rounded-2xl"
-                  value={editing.label ??""}
+                  value={editing.label ?? ""}
                   onChange={(e) => setEditing({ ...editing, label: e.target.value })}
                 />
 

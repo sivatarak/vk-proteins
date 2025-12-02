@@ -51,21 +51,21 @@ export default function CartPage() {
             localStorage.setItem("cart", JSON.stringify(updated));
         }
     }
+    function updateQuantity(productId: number, newQty: number) {
+        const cart = JSON.parse(localStorage.getItem("cart") || "[]");
 
-    function updateQuantity(id: number, qty: number) {
-        if (qty <= 0) qty = 0.25;
+        const index = cart.findIndex((item: any) => item.id === productId);
 
-        const updated = cart.map((item) =>
-            item.id === id
-                ? {
-                    ...item,
-                    quantity: Number(qty.toFixed(3)),
-                    total: Number((qty * item.price).toFixed(2)),
-                }
-                : item
-        );
-        syncCart(updated);
+        if (index >= 0) {
+            cart[index].quantity = newQty;
+            cart[index].total = Number((newQty * cart[index].price).toFixed(2));
+        }
+
+        localStorage.setItem("cart", JSON.stringify(cart));
+        setCart(cart); // rerender cart UI
     }
+
+
 
     function removeItem(id: number) {
         const updated = cart.filter((item) => item.id !== id);
@@ -147,49 +147,62 @@ export default function CartPage() {
                             </div>
 
                             {/* Quantity Selector (decimal) */}
-                            <div className="flex items-center gap-3 mt-2">
+                            {/* Quantity Selector inside Cart */}
+                            <div className="flex items-center gap-3">
                                 {/* Minus */}
                                 <button
-                                    onClick={() =>
-                                        updateQuantity(
-                                            item.id,
-                                            Number(Math.max(0.25, item.quantity - 0.25).toFixed(3))
-                                        )
-                                    }
+                                    onClick={() => {
+                                        const qty = item.quantity;
+                                        let newQty = qty;
+
+                                        // Chicken → minus 0.25 | Eggs → minus 1
+                                        if (item.unit === "kg") newQty -= 0.25;
+                                        else newQty -= 1;
+
+                                        if (newQty < 0) newQty = 0;
+
+                                        updateQuantity(item.id, Number(newQty.toFixed(3)));
+                                    }}
                                     className="px-3 py-2 bg-gray-200 rounded-xl text-lg font-bold text-gray-700"
                                 >
                                     –
                                 </button>
 
-                                {/* Input */}
+                                {/* Free-hand input */}
                                 <input
                                     type="number"
-                                    step="0.01"
-                                    min={0.25}
+                                    step="0.001"
+                                    min="0"
                                     value={item.quantity}
                                     onChange={(e) => {
                                         let value = parseFloat(e.target.value);
-                                        if (!value || value < 0.25) value = 0.25;
-                                        updateQuantity(item.id, value);
+                                        if (isNaN(value) || value < 0) value = 0;
+
+                                        updateQuantity(item.id, Number(value.toFixed(3)));
                                     }}
                                     className="w-24 text-center px-3 py-2 border-2 rounded-xl bg-gray-50 text-gray-800 font-semibold"
                                 />
 
                                 {/* Plus */}
                                 <button
-                                    onClick={() =>
-                                        updateQuantity(
-                                            item.id,
-                                            Number((item.quantity + 0.25).toFixed(3))
-                                        )
-                                    }
+                                    onClick={() => {
+                                        const qty = item.quantity;
+                                        let newQty = qty;
+
+                                        // Chicken → plus 0.25 | Eggs → plus 1
+                                        if (item.unit === "kg") newQty += 0.25;
+                                        else newQty += 1;
+
+                                        updateQuantity(item.id, Number(newQty.toFixed(3)));
+                                    }}
                                     className="px-3 py-2 bg-gray-200 rounded-xl text-lg font-bold text-gray-700"
                                 >
                                     +
                                 </button>
 
-                                <span className="font-medium text-gray-700">kg</span>
+                                <span className="font-medium text-gray-700">{item.unit === "kg" ? "kg" : "pcs"}</span>
                             </div>
+
 
                             <div className="flex justify-between items-center pt-4">
                                 <span className="text-lg font-semibold text-gray-700">
@@ -252,3 +265,5 @@ export default function CartPage() {
         </div>
     );
 }
+
+
