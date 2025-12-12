@@ -29,7 +29,7 @@ export default function LoginPage() {
 
         // Redirect based on role
         if (data.role === "admin") {
-            window.location.href = "/admin";
+           window.location.href = "/admin/login";
         } else {
             window.location.href = "/user";
         }

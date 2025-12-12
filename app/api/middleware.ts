@@ -1,42 +1,23 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifyToken } from "../lib/auth";
 
 export function middleware(req: NextRequest) {
-  const token = req.cookies.get("vk_token")?.value || null;
+  const token = req.cookies.get("token")?.value;
 
-  const publicPaths = ["/login", "/", "/api/auth/login"];
-
-  if (publicPaths.includes(req.nextUrl.pathname)) {
-    return NextResponse.next();
+  // Protect admin dashboard
+  if (req.nextUrl.pathname.startsWith("/admin") && !token) {
+    return NextResponse.redirect(new URL("/admin/login", req.url));
   }
 
-  if (!token) {
-    return NextResponse.redirect(new URL("/login", req.url));
+  // Protect admin API
+  if (req.nextUrl.pathname.startsWith("/api/admin") && !token) {
+    return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const payload = verifyToken(token);
-  if (!payload) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-
-  // ADMIN ONLY PAGES
-  if (req.nextUrl.pathname.startsWith("/admin")) {
-    if (payload.role !== "admin") {
-      return NextResponse.redirect(new URL("/login", req.url));
-    }
-  }
-
-  // USER ONLY PAGES
-  if (req.nextUrl.pathname.startsWith("/user")) {
-    if (payload.role !== "user" && payload.role !== "admin") {
-      return NextResponse.redirect(new URL("/login", req.url));
-    }
-  }
-
+  // Allow everything else (public user)
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/user/:path*", "/login", "/"]
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
 };
