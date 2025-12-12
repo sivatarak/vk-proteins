@@ -9,7 +9,7 @@ export default async function AdminPage() {
       orderBy: { id: "asc" },
       include: {
         category: true,
-      } as const,
+      } as any,
       
     }),
     prisma.category.findMany({
