@@ -7,7 +7,10 @@ export default async function AdminPage() {
     prisma.product.findMany({
       where: { isActive: true },
       orderBy: { id: "asc" },
-      include: { category: true }, // important
+      include: {
+        category: true,
+      } as const,
+      
     }),
     prisma.category.findMany({
       orderBy: { id: "asc" },
