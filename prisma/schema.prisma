@@ -17,15 +17,20 @@ model User {
   googleId     String?
   createdAt    DateTime @default(now())
 }
+// prisma/schema.prisma
 model Category {
   id        Int      @id @default(autoincrement())
   label     String
-  value     String   @unique   // slug format (boiler, layer, egg)
-  unit      String             // kg, piece, dozen
+  value     String   @unique
+  unit      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   products  Product[]
+
+  // ADD THESE INDEXES:
+  @@index([value])
+  @@index([createdAt])
+  @@index([label])
 }
 
 model Product {
@@ -33,15 +38,20 @@ model Product {
   name         String
   label        String?
   categoryId   Int
-  category     Category @relation(fields: [categoryId], references: [id])
+  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade) // Add onDelete
   unit         String
   pricePerUnit Float
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  // 🔥 CRITICAL - ADD THESE INDEXES:
+  @@index([categoryId])  // Speeds up product lookups by category
+  @@index([isActive])    // Speeds up filtering active products
+  @@index([createdAt])   // Speeds up sorting by date
+  @@index([pricePerUnit]) // Speeds up price filtering
+  @@index([name])        // Speeds up name searches
 }
-
-
 enum Role {
   admin
   user

@@ -41,23 +41,46 @@ export default function UserPage() {
   }, []);
 
   // Load products
+  // In your useEffect - REPLACE THE FETCH PART
   useEffect(() => {
     setLoading(true);
-    fetch("/api/products")
-      .then((r) => r.json())
-      .then((data) => {
-        setProducts(data);
-        // Preload first 6 images
-        data.slice(0, 6).forEach((p: Product) => {
-          const img = document.createElement('img');
-          img.src = getProductImage(p);
-        });
+
+    // Add timeout to prevent hanging
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.log("⚠️ Fetch taking too long, showing partial data");
         setLoading(false);
+      }
+    }, 3000);
+
+    // Optimized fetch with cache
+    fetch("/api/products", {
+      cache: 'force-cache',
+      headers: {
+        'Cache-Control': 'max-age=30'
+      }
+    })
+      .then(r => {
+        if (!r.ok) throw new Error("Failed to fetch");
+        return r.json();
+      })
+      .then(data => {
+        clearTimeout(timeoutId);
+        setProducts(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        clearTimeout(timeoutId);
+        console.error("Fetch error:", err);
+        setLoading(false);
+        // You could show an error message here
       });
 
-    // Load cart count
+    // Load cart from localStorage
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
     setCartCount(cart.length);
+
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const showToast = (msg: string) => {
