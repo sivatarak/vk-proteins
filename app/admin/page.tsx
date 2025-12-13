@@ -4,6 +4,7 @@ import AdminClient from "./adminClient";
 
 export default async function AdminPage() {
   const [products, categories] = await Promise.all([
+    
     prisma.product.findMany({
       where: { isActive: true },
       orderBy: { id: "asc" },
