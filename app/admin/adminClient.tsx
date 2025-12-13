@@ -1,4 +1,4 @@
-// src/app/admin/page.tsx - FULLY UPDATED & FIXED VERSION
+// src/app/admin/page.tsx - FULLY COMPLETE, MOBILE-RESPONSIVE VERSION
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -38,17 +38,17 @@ type Product = {
 type ToastType = "success" | "error" | "warning";
 
 // =======================
-// SKELETON COMPONENTS
+// SKELETON COMPONENT
 // =======================
 const ProductCardSkeleton = () => (
   <div className="bg-white rounded-3xl shadow-2xl overflow-hidden animate-pulse">
-    <div className="h-72 bg-gradient-to-r from-gray-200 to-gray-300"></div>
-    <div className="p-7 space-y-4">
+    <div className="h-56 sm:h-64 bg-gradient-to-r from-gray-200 to-gray-300"></div>
+    <div className="p-5 sm:p-6 space-y-4">
       <div className="h-8 bg-gray-300 rounded w-3/4"></div>
-      <div className="h-12 bg-gray-200 rounded"></div>
-      <div className="flex gap-4">
-        <div className="flex-1 h-14 bg-gray-300 rounded-2xl"></div>
-        <div className="flex-1 h-14 bg-gray-300 rounded-2xl"></div>
+      <div className="h-10 bg-gray-200 rounded"></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="h-12 bg-gray-300 rounded-2xl"></div>
+        <div className="h-12 bg-gray-300 rounded-2xl"></div>
       </div>
     </div>
   </div>
@@ -88,7 +88,7 @@ export default function AdminClient({
   const [refreshing, setRefreshing] = useState(false);
 
   // =======================
-  // TOAST SYSTEM
+  // TOAST
   // =======================
   const showToast = useCallback((type: ToastType, msg: string) => {
     setToast({ show: true, type, msg });
@@ -96,7 +96,7 @@ export default function AdminClient({
   }, []);
 
   // =======================
-  // UNIT HELPERS
+  // UNIT HELPER
   // =======================
   const getUnitForCategory = useCallback((id: number) => {
     const category = categories.find((c) => c.id === id);
@@ -113,7 +113,7 @@ export default function AdminClient({
 
       const res = await fetch("/api/products", {
         signal: controller.signal,
-        headers: { 'Cache-Control': 'no-cache' }
+        headers: { "Cache-Control": "no-cache" },
       });
 
       clearTimeout(timeout);
@@ -121,7 +121,7 @@ export default function AdminClient({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
-      
+
       const productsWithUnits = data.map((p: any) => ({
         ...p,
         unit: p.unit || p.category?.unit || "pcs",
@@ -141,11 +141,11 @@ export default function AdminClient({
       const res = await fetch("/api/categories");
       const data = await res.json();
       setCategories(data);
-      
+
       if (form.categoryId > 0 && !data.find((c: Category) => c.id === form.categoryId)) {
-        setForm(prev => ({ ...prev, categoryId: data[0]?.id || 0 }));
+        setForm((prev) => ({ ...prev, categoryId: data[0]?.id || 0 }));
       }
-      
+
       return true;
     } catch (error) {
       console.error("Failed to refresh categories:", error);
@@ -153,19 +153,19 @@ export default function AdminClient({
     }
   }, [form.categoryId]);
 
-  const refreshAllData = useCallback(async (isInitial = false) => {
-    if (isInitial) setIsInitialLoading(true);
-    setRefreshing(true);
+  const refreshAllData = useCallback(
+    async (isInitial = false) => {
+      if (isInitial) setIsInitialLoading(true);
+      setRefreshing(true);
 
-    await Promise.all([refreshProducts(), refreshCategories()]);
+      await Promise.all([refreshProducts(), refreshCategories()]);
 
-    setRefreshing(false);
-    if (isInitial) setIsInitialLoading(false);
-  }, [refreshProducts, refreshCategories]);
+      setRefreshing(false);
+      if (isInitial) setIsInitialLoading(false);
+    },
+    [refreshProducts, refreshCategories]
+  );
 
-  // =======================
-  // INITIAL LOAD
-  // =======================
   useEffect(() => {
     refreshAllData(true);
   }, [refreshAllData]);
@@ -175,24 +175,14 @@ export default function AdminClient({
   // =======================
   const createProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!form.label.trim()) {
-      showToast("error", "Product name required");
-      return;
-    }
-    
-    if (!form.pricePerUnit || Number(form.pricePerUnit) <= 0) {
-      showToast("error", "Valid price required");
-      return;
-    }
-    
-    if (form.categoryId === 0) {
-      showToast("error", "Please select a category");
-      return;
-    }
+
+    if (!form.label.trim()) return showToast("error", "Product name required");
+    if (!form.pricePerUnit || Number(form.pricePerUnit) <= 0)
+      return showToast("error", "Valid price required");
+    if (form.categoryId === 0) return showToast("error", "Please select a category");
 
     setActionLoading(true);
-    
+
     try {
       const res = await fetch("/api/products", {
         method: "POST",
@@ -206,18 +196,16 @@ export default function AdminClient({
 
       if (res.ok) {
         showToast("success", "Product added successfully!");
-        setForm({ 
-          label: "", 
-          categoryId: categories[0]?.id || 0, 
-          pricePerUnit: "" 
-        });
-        
+        setForm({ label: "", categoryId: categories[0]?.id || 0, pricePerUnit: "" });
+
         const newProduct = await res.json();
-        setProducts(prev => [{
-          ...newProduct,
-          unit: newProduct.unit || getUnitForCategory(newProduct.categoryId),
-        }, ...prev]);
-        
+        setProducts((prev) => [
+          {
+            ...newProduct,
+            unit: newProduct.unit || getUnitForCategory(newProduct.categoryId),
+          },
+          ...prev,
+        ]);
       } else {
         const error = await res.json();
         showToast("error", error.error || "Failed to add product");
@@ -233,7 +221,7 @@ export default function AdminClient({
     if (!editing) return;
 
     setActionLoading(true);
-    
+
     try {
       const res = await fetch(`/api/products/${editing.id}`, {
         method: "PUT",
@@ -247,14 +235,16 @@ export default function AdminClient({
 
       if (res.ok) {
         showToast("success", "Product updated!");
-        
-        setProducts(prev => 
-          prev.map(p => p.id === editing.id ? {
-            ...editing,
-            unit: editing.unit || getUnitForCategory(editing.categoryId),
-          } : p)
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === editing.id
+              ? {
+                  ...editing,
+                  unit: editing.unit || getUnitForCategory(editing.categoryId),
+                }
+              : p
+          )
         );
-        
         setEditing(null);
       } else {
         const error = await res.json();
@@ -274,42 +264,23 @@ export default function AdminClient({
 
   const deleteProductFinal = async () => {
     if (!deleteId) return;
-    
-    const productToDelete = products.find(p => p.id === deleteId);
-    
-    setProducts(prev => prev.filter(p => p.id !== deleteId));
+
+    const productToDelete = products.find((p) => p.id === deleteId);
+
+    setProducts((prev) => prev.filter((p) => p.id !== deleteId));
     setShowConfirmDelete(false);
-    
-    showToast("success", `${productToDelete?.label || 'Product'} deleted`);
-    
+    showToast("success", `${productToDelete?.label || "Product"} deleted`);
+
     (async () => {
       try {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 3000);
-        
-        await fetch(`/api/products/${deleteId}`, {
-          method: "DELETE",
-          signal: controller.signal,
-        });
-        
+        await fetch(`/api/products/${deleteId}`, { method: "DELETE" });
         setTimeout(() => refreshProducts(), 500);
-        
       } catch (error) {
-        console.log("Background delete failed (non-critical):", error);
-        setTimeout(async () => {
-          const success = await refreshProducts();
-          if (!success) {
-            setProducts(prev => {
-              if (productToDelete && !prev.find(p => p.id === deleteId)) {
-                return [...prev, productToDelete].sort((a, b) => a.id - b.id);
-              }
-              return prev;
-            });
-          }
-        }, 1000);
+        console.log("Background delete failed:", error);
+        setTimeout(() => refreshProducts(), 1000);
       }
     })();
-    
+
     setDeleteId(null);
   };
 
@@ -317,13 +288,10 @@ export default function AdminClient({
   // CATEGORY OPERATIONS
   // =======================
   const addNewCategory = async () => {
-    if (!newCategory.label.trim()) {
-      showToast("error", "Category name required");
-      return;
-    }
+    if (!newCategory.label.trim()) return showToast("error", "Category name required");
 
     setActionLoading(true);
-    
+
     try {
       const res = await fetch("/api/categories", {
         method: "POST",
@@ -336,19 +304,17 @@ export default function AdminClient({
 
       if (res.ok) {
         const created = await res.json();
-        
-        setCategories(prev => [...prev, created]);
-        setForm(prev => ({ ...prev, categoryId: created.id }));
+        setCategories((prev) => [...prev, created]);
+        setForm((prev) => ({ ...prev, categoryId: created.id }));
         setNewCategory({ label: "", unit: "kg" });
         setShowAddCategory(false);
-        
         showToast("success", "Category added!");
       } else {
         const error = await res.json();
         showToast("error", error.error || "Failed to add category");
       }
     } catch (error) {
-      showToast("error", "Network error - please try again");
+      showToast("error", "Network error");
     } finally {
       setActionLoading(false);
     }
@@ -356,41 +322,31 @@ export default function AdminClient({
 
   const openDeleteCategoryModal = (id: number) => {
     const inUse = products.some((p) => p.categoryId === id);
-    if (inUse) {
-      showToast("error", "Cannot delete: products are using this category");
-      return;
-    }
+    if (inUse) return showToast("error", "Cannot delete: products are using this category");
     setCategoryToDelete(id);
     setShowDeleteCategory(true);
   };
 
   const deleteCategoryFinal = async () => {
     if (!categoryToDelete) return;
-    
-    const categoryToRemove = categories.find(c => c.id === categoryToDelete);
-    
-    setCategories(prev => prev.filter(cat => cat.id !== categoryToDelete));
+
+    const categoryToRemove = categories.find((c) => c.id === categoryToDelete);
+
+    setCategories((prev) => prev.filter((cat) => cat.id !== categoryToDelete));
     setShowDeleteCategory(false);
-    
-    showToast("success", `${categoryToRemove?.label || 'Category'} deleted`);
-    
+    showToast("success", `${categoryToRemove?.label || "Category"} deleted`);
+
     (async () => {
       try {
-        await fetch(`/api/categories/${categoryToDelete}`, { 
-          method: "DELETE" 
-        });
+        await fetch(`/api/categories/${categoryToDelete}`, { method: "DELETE" });
       } catch (error) {
-        console.log("Background category delete failed:", error);
         setTimeout(() => refreshCategories(), 1000);
       }
     })();
-    
+
     setCategoryToDelete(null);
   };
 
-  // =======================
-  // AUTH
-  // =======================
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
@@ -404,8 +360,8 @@ export default function AdminClient({
       {/* Initial Loading Overlay */}
       {isInitialLoading && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-3xl shadow-2xl">
-            <div className="w-16 h-16 border-4 border-pink-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="bg-white p-8 rounded-3xl shadow-2xl text-center">
+            <div className="w-16 h-16 border-4 border-pink-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
             <p className="mt-4 text-xl font-bold">Loading Dashboard...</p>
           </div>
         </div>
@@ -413,59 +369,60 @@ export default function AdminClient({
 
       {/* HEADER */}
       <header className="bg-gradient-to-r from-pink-600 via-orange-500 to-yellow-500 text-white shadow-2xl sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 bg-white rounded-2xl shadow-2xl p-3">
-              <Image
-                src="/Vk_protein_logo.jpg"
-                alt="VK Proteins"
-                width={80}
-                height={80}
-                className="rounded-xl"
-                priority
-              />
+        <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl shadow-2xl p-2 sm:p-3 flex-shrink-0">
+                <Image
+                  src="/Vk_protein_logo.jpg"
+                  alt="VK Proteins"
+                  width={80}
+                  height={80}
+                  className="rounded-xl"
+                  priority
+                />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">Admin Dashboard</h1>
+                <p className="text-sm sm:text-base opacity-90">Manage VK Proteins Inventory</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-4xl font-bold">Admin Dashboard</h1>
-              <p className="text-lg opacity-90">Manage VK Proteins Inventory</p>
+
+            <div className="flex flex-wrap gap-3 justify-center sm:justify-end">
+              <button
+                onClick={() => refreshAllData()}
+                disabled={refreshing}
+                className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2.5 rounded-2xl font-semibold text-sm sm:text-base transition disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${refreshing ? "animate-spin" : ""}`} />
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="bg-white/20 hover:bg-white/30 px-6 py-2.5 rounded-2xl font-semibold text-sm sm:text-base transition"
+              >
+                Logout
+              </button>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => refreshAllData()}
-              disabled={refreshing}
-              className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-5 py-3 rounded-2xl font-bold text-lg transition disabled:opacity-50"
-              title="Refresh data"
-            >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
-            
-            <button
-              onClick={handleLogout}
-              className="bg-white/20 hover:bg-white/30 px-8 py-3 rounded-2xl font-bold text-lg transition"
-            >
-              Logout
-            </button>
           </div>
         </div>
       </header>
 
       {/* MAIN CONTENT */}
-      <div className="max-w-7xl mx-auto px-4 py-10">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 max-w-7xl">
         {/* ADD PRODUCT FORM */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8 mb-12">
-          <h2 className="text-3xl font-bold mb-6 flex items-center gap-4 text-gray-800">
-            <Plus className="w-10 h-10 text-pink-600" />
+        <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 mb-10">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-6 flex items-center gap-3 text-gray-800">
+            <Plus className="w-8 h-8 sm:w-10 sm:h-10 text-pink-600" />
             Add New Product
           </h2>
 
-          <form onSubmit={createProduct} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
+          <form onSubmit={createProduct} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             <input
               type="text"
               placeholder="Product Name (e.g. Chicken Breast)"
-              className="px-5 py-4 text-lg border-2 border-gray-200 rounded-2xl focus:border-pink-500 outline-none transition"
+              className="px-4 py-3.5 text-base border-2 border-gray-200 rounded-2xl focus:border-pink-500 outline-none transition"
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
               required
@@ -473,15 +430,12 @@ export default function AdminClient({
 
             <div className="relative">
               <select
-                className="w-full px-5 py-4 text-lg bg-white border-2 border-gray-200 rounded-2xl appearance-none pr-12"
+                className="w-full px-4 py-3.5 text-base bg-white border-2 border-gray-200 rounded-2xl appearance-none pr-10"
                 value={form.categoryId}
                 onChange={(e) => {
                   const val = Number(e.target.value);
-                  if (val === -1) {
-                    setShowAddCategory(true);
-                  } else {
-                    setForm({ ...form, categoryId: val });
-                  }
+                  if (val === -1) setShowAddCategory(true);
+                  else setForm({ ...form, categoryId: val });
                 }}
               >
                 <option value={0}>Select Category</option>
@@ -492,20 +446,19 @@ export default function AdminClient({
                 ))}
                 <option value={-1}>+ Add New Category</option>
               </select>
-              
+
               {form.categoryId > 0 && (
                 <button
                   type="button"
                   onClick={() => openDeleteCategoryModal(form.categoryId)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-red-100 hover:bg-red-200 p-2 rounded-xl text-red-600 transition"
-                  title="Delete selected category"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-red-100 hover:bg-red-200 p-1.5 rounded-lg text-red-600 transition"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
               )}
             </div>
 
-            <div className="px-5 py-4 bg-gradient-to-r from-pink-50 to-orange-50 rounded-2xl font-bold text-lg flex items-center">
+            <div className="px-4 py-3.5 bg-gradient-to-r from-pink-50 to-orange-50 rounded-2xl font-semibold text-base flex items-center justify-center">
               Unit: <span className="ml-2 text-pink-600">{getUnitForCategory(form.categoryId)}</span>
             </div>
 
@@ -514,7 +467,7 @@ export default function AdminClient({
               step="0.01"
               min="0.01"
               placeholder="Price ₹"
-              className="px-5 py-4 text-lg border-2 border-gray-200 rounded-2xl focus:border-pink-500 outline-none transition"
+              className="px-4 py-3.5 text-base border-2 border-gray-200 rounded-2xl focus:border-pink-500 outline-none transition"
               value={form.pricePerUnit}
               onChange={(e) => setForm({ ...form, pricePerUnit: e.target.value })}
               required
@@ -523,34 +476,29 @@ export default function AdminClient({
             <button
               type="submit"
               disabled={actionLoading}
-              className="bg-gradient-to-r from-pink-600 to-orange-600 text-white font-bold text-lg py-4 rounded-2xl hover:shadow-xl transition active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
+              className="bg-gradient-to-r from-pink-600 to-orange-600 text-white font-bold text-base py-3.5 rounded-2xl hover:shadow-xl transition active:scale-98 disabled:opacity-70"
             >
-              {actionLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Adding...
-                </span>
-              ) : (
-                "Add Product"
-              )}
+              {actionLoading ? "Adding..." : "Add Product"}
             </button>
           </form>
         </div>
 
         {/* PRODUCTS SECTION */}
-        <div className="mb-6 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-800">
+        <div className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
             Products ({products.length})
             {refreshing && <span className="ml-3 text-sm font-normal text-gray-500">↻ Refreshing...</span>}
           </h2>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 text-center sm:text-right">
             Click refresh to sync with server
           </div>
         </div>
 
         {/* PRODUCTS GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-         { products.length === 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {isInitialLoading ? (
+            Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={`skeleton-${i}`} />)
+          ) : products.length === 0 ? (
             <div className="col-span-full text-center py-16 bg-white rounded-3xl shadow-lg">
               <div className="text-5xl mb-4">📦</div>
               <h3 className="text-2xl font-bold text-gray-700 mb-2">No Products Found</h3>
@@ -562,45 +510,43 @@ export default function AdminClient({
                 key={product.id}
                 className="bg-white rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
               >
-                <div className="relative h-64">
+                <div className="relative h-56 sm:h-64">
                   <Image
                     src={getProductImage(product)}
                     alt={product.label || "Product"}
                     fill
                     className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 400px"
-                    priority={product.id <= 4}
-                    loading={product.id > 4 ? "lazy" : "eager"}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                   />
 
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-5 text-white">
-                    <h3 className="text-xl font-bold truncate">
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-4 sm:p-5 text-white">
+                    <h3 className="text-lg sm:text-xl font-bold truncate">
                       {product.label || product.category?.label}
                     </h3>
-                    <p className="text-sm opacity-90 mt-1">
+                    <p className="text-xs sm:text-sm opacity-90 mt-1">
                       {product.unit || product.category?.unit || "pcs"} • {product.category?.label}
                     </p>
                   </div>
                 </div>
 
-                <div className="p-6 space-y-5">
-                  <div className="text-3xl font-extrabold text-green-600">
+                <div className="p-5 sm:p-6 space-y-4">
+                  <div className="text-2xl sm:text-3xl font-extrabold text-green-600">
                     ₹{product.pricePerUnit.toFixed(2)}
-                    <span className="text-lg text-gray-600">
+                    <span className="text-base sm:text-lg text-gray-600">
                       /{product.unit || product.category?.unit || "pcs"}
                     </span>
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={() => setEditing(product)}
-                      className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg transition hover:brightness-110"
+                      className="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg transition text-sm sm:text-base"
                     >
                       <Edit3 className="w-4 h-4" /> Edit
                     </button>
                     <button
                       onClick={() => openDeleteModal(product.id)}
-                      className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg transition hover:brightness-110"
+                      className="bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg transition text-sm sm:text-base"
                     >
                       <Trash2 className="w-4 h-4" /> Delete
                     </button>
@@ -611,53 +557,47 @@ export default function AdminClient({
           )}
         </div>
 
-        {/* All Modals (Edit, Add Category, Delete Confirmations) remain unchanged */}
-        {/* ... (Same as your original code - Edit Modal, Add Category Modal, Delete Modals, Toast) */}
-
+        {/* EDIT PRODUCT MODAL */}
         {editing && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold">Edit Product</h2>
-                <button onClick={() => setEditing(null)} className="text-gray-500 hover:text-gray-700 transition">
+                <h2 className="text-xl sm:text-2xl font-bold">Edit Product</h2>
+                <button onClick={() => setEditing(null)}>
                   <X className="w-6 h-6" />
                 </button>
               </div>
-              
+
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
                   <input
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-lg focus:border-pink-500 outline-none transition"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none"
                     value={editing.label ?? ""}
                     onChange={(e) => setEditing({ ...editing, label: e.target.value })}
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit</label>
                   <input
                     type="number"
                     step="0.01"
                     min="0.01"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-lg focus:border-pink-500 outline-none transition"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none"
                     value={editing.pricePerUnit}
                     onChange={(e) => setEditing({ ...editing, pricePerUnit: Number(e.target.value) })}
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                   <select
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-lg focus:border-pink-500 outline-none transition"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
                     value={editing.categoryId}
                     onChange={(e) => {
                       const id = Number(e.target.value);
-                      setEditing({ 
-                        ...editing, 
-                        categoryId: id,
-                        unit: getUnitForCategory(id)
-                      });
+                      setEditing({ ...editing, categoryId: id, unit: getUnitForCategory(id) });
                     }}
                   >
                     {categories.map((c) => (
@@ -667,25 +607,18 @@ export default function AdminClient({
                     ))}
                   </select>
                 </div>
-                
+
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={updateProduct}
                     disabled={actionLoading}
-                    className="flex-1 bg-gradient-to-r from-pink-600 to-orange-600 text-white py-3 rounded-xl font-bold hover:shadow-lg transition disabled:opacity-70"
+                    className="flex-1 bg-gradient-to-r from-pink-600 to-orange-600 text-white py-3 rounded-xl font-bold disabled:opacity-70"
                   >
-                    {actionLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Saving...
-                      </span>
-                    ) : (
-                      "Save Changes"
-                    )}
+                    {actionLoading ? "Saving..." : "Save Changes"}
                   </button>
                   <button
                     onClick={() => setEditing(null)}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition"
+                    className="flex-1 bg-gray-100 py-3 rounded-xl font-bold"
                   >
                     Cancel
                   </button>
@@ -695,27 +628,27 @@ export default function AdminClient({
           </div>
         )}
 
-        {/* Add Category Modal, Delete Modals, Toast - unchanged (same as original) */}
-        {/* You can paste the rest from your original code here */}
-
+        {/* ADD CATEGORY MODAL */}
         {showAddCategory && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in">
-              <h2 className="text-2xl font-bold mb-6">Add New Category</h2>
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl">
+              <h2 className="text-xl sm:text-2xl font-bold mb-6">Add New Category</h2>
+
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category Name</label>
                   <input
                     placeholder="e.g., Fish, Meat, Dairy"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none transition"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none"
                     value={newCategory.label}
                     onChange={(e) => setNewCategory({ ...newCategory, label: e.target.value })}
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Unit of Measurement</label>
                   <select
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-pink-500 outline-none transition"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
                     value={newCategory.unit}
                     onChange={(e) => setNewCategory({ ...newCategory, unit: e.target.value })}
                   >
@@ -726,11 +659,12 @@ export default function AdminClient({
                     <option value="pack">Pack</option>
                   </select>
                 </div>
+
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={addNewCategory}
                     disabled={actionLoading}
-                    className="flex-1 bg-gradient-to-r from-pink-600 to-orange-600 text-white py-3 rounded-xl font-bold hover:shadow-lg transition disabled:opacity-70"
+                    className="flex-1 bg-gradient-to-r from-pink-600 to-orange-600 text-white py-3 rounded-xl font-bold disabled:opacity-70"
                   >
                     {actionLoading ? "Adding..." : "Add Category"}
                   </button>
@@ -739,7 +673,7 @@ export default function AdminClient({
                       setShowAddCategory(false);
                       setNewCategory({ label: "", unit: "kg" });
                     }}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition"
+                    className="flex-1 bg-gray-100 py-3 rounded-xl font-bold"
                   >
                     Cancel
                   </button>
@@ -749,21 +683,29 @@ export default function AdminClient({
           </div>
         )}
 
-        {/* Delete Product & Category Modals + Toast - same as your original */}
-
+        {/* DELETE PRODUCT CONFIRM MODAL */}
         {showConfirmDelete && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center animate-in zoom-in">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center">
               <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-5" />
               <h3 className="text-xl font-bold mb-3">Delete Product?</h3>
               <p className="text-gray-600 mb-7">
                 This product will be removed immediately. This action cannot be undone.
               </p>
               <div className="flex gap-3">
-                <button onClick={deleteProductFinal} className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-xl font-bold hover:shadow-lg transition">
+                <button
+                  onClick={deleteProductFinal}
+                  className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-xl font-bold"
+                >
                   Delete Now
                 </button>
-                <button onClick={() => { setShowConfirmDelete(false); setDeleteId(null); }} className="flex-1 bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition">
+                <button
+                  onClick={() => {
+                    setShowConfirmDelete(false);
+                    setDeleteId(null);
+                  }}
+                  className="flex-1 bg-gray-100 py-3 rounded-xl font-bold"
+                >
                   Cancel
                 </button>
               </div>
@@ -771,19 +713,29 @@ export default function AdminClient({
           </div>
         )}
 
+        {/* DELETE CATEGORY CONFIRM MODAL */}
         {showDeleteCategory && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center animate-in zoom-in">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center">
               <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-5" />
               <h3 className="text-xl font-bold mb-3">Delete Category?</h3>
               <p className="text-gray-600 mb-7">
                 This category will be removed from the list. Products using it won't be affected.
               </p>
               <div className="flex gap-3">
-                <button onClick={deleteCategoryFinal} className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-xl font-bold hover:shadow-lg transition">
+                <button
+                  onClick={deleteCategoryFinal}
+                  className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-xl font-bold"
+                >
                   Delete
                 </button>
-                <button onClick={() => { setShowDeleteCategory(false); setCategoryToDelete(null); }} className="flex-1 bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-bold transition">
+                <button
+                  onClick={() => {
+                    setShowDeleteCategory(false);
+                    setCategoryToDelete(null);
+                  }}
+                  className="flex-1 bg-gray-100 py-3 rounded-xl font-bold"
+                >
                   Cancel
                 </button>
               </div>
@@ -791,10 +743,19 @@ export default function AdminClient({
           </div>
         )}
 
+        {/* TOAST NOTIFICATION */}
         {toast.show && (
-          <div className={`fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-right-5 ${toast.type === "success" ? "bg-green-600" : toast.type === "warning" ? "bg-yellow-600" : "bg-red-600"}`}>
-            {toast.type === "success" ? <CheckCircle className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
-            <span className="font-bold text-white">{toast.msg}</span>
+          <div
+            className={`fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-auto sm:right-6 px-5 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 text-white ${
+              toast.type === "success" ? "bg-green-600" : "bg-red-600"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <CheckCircle className="w-6 h-6 flex-shrink-0" />
+            ) : (
+              <AlertTriangle className="w-6 h-6 flex-shrink-0" />
+            )}
+            <span className="font-bold text-sm sm:text-base">{toast.msg}</span>
           </div>
         )}
       </div>
