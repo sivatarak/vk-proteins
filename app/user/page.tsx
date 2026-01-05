@@ -1,4 +1,3 @@
-// src/app/page.tsx (or wherever your UserPage is)
 "use client";
 
 import { useEffect, useState } from "react";
@@ -41,17 +40,11 @@ export default function UserPage() {
   }, []);
 
   // Load products
-  // In your useEffect - REPLACE THE FETCH PART
   useEffect(() => {
+    // First check localStorage for pre-fetched products
+    
+    // Fallback to fetch if no cache
     setLoading(true);
-
-    // Add timeout to prevent hanging
-    const timeoutId = setTimeout(() => {
-      if (loading) {
-        console.log("⚠️ Fetch taking too long, showing partial data");
-        setLoading(false);
-      }
-    }, 3000);
 
     // Optimized fetch with cache
     fetch("/api/products", {
@@ -65,12 +58,12 @@ export default function UserPage() {
         return r.json();
       })
       .then(data => {
-        clearTimeout(timeoutId);
         setProducts(data);
+        // Cache for future use
+        localStorage.setItem("cachedProducts", JSON.stringify(data));
         setLoading(false);
       })
       .catch(err => {
-        clearTimeout(timeoutId);
         console.error("Fetch error:", err);
         setLoading(false);
         // You could show an error message here
@@ -79,8 +72,6 @@ export default function UserPage() {
     // Load cart from localStorage
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
     setCartCount(cart.length);
-
-    return () => clearTimeout(timeoutId);
   }, []);
 
   const showToast = (msg: string) => {
@@ -88,17 +79,22 @@ export default function UserPage() {
     setTimeout(() => setToast({ show: false, type: "success", msg: "" }), 2500);
   };
 
-  const getStep = (unit: string) => (unit === "kg" ? 0.25 : unit === "dozen" ? 12 : 1);
   const getDisplayUnit = (unit: string) => (unit === "kg" ? "kg" : unit === "piece" ? "pcs" : unit);
+  const getStep = (unit: string) => (unit === "kg" ? 0.25 : unit === "dozen" ? 12 : 1);
 
+  // In getTotalPrice and addToCart, change default to 0 if quantity is 0
   const getTotalPrice = (p: Product) => {
-    const q = quantities[p.id] || getStep(p.category.unit);
+    const q = quantities[p.id] ?? 0;
     return (q * p.pricePerUnit).toFixed(2);
   };
 
+  // Prevent adding to cart if quantity is 0 or empty
   const addToCart = async (product: Product) => {
-    const qty = quantities[product.id] || getStep(product.category.unit);
-    if (qty <= 0) return;
+    const qty = quantities[product.id] ?? 0;
+    if (qty <= 0) {
+      showToast("Please select a quantity");
+      return;
+    }
 
     setActionLoading(product.id);
     try {
@@ -130,6 +126,15 @@ export default function UserPage() {
     <div className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
   );
 
+  const handleQuantityChange = (id: number, value: string, step: number) => {
+    let num = parseFloat(value);
+    if (isNaN(num) || num < step) {
+      num = step;
+    }
+    // Round to nearest multiple of step if needed, but for simplicity, allow any >= min
+    setQuantities({ ...quantities, [id]: num });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-yellow-50 px-3 sm:px-4">
       {loading && (
@@ -146,7 +151,7 @@ export default function UserPage() {
         <div className="max-w-6xl mx-auto px-4 py-5 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Image
-              src="/Vk_protein_logo.jpg"
+              src="/VK_proteins.png"  // ← No /public, no backslashes, exact filename case
               alt="VK Proteins"
               width={48}
               height={48}
@@ -182,102 +187,131 @@ export default function UserPage() {
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {products.map((p) => (
-            <div key={p.id} className="bg-white rounded-3xl shadow-lg overflow-hidden">
-              {/* Product Image */}
-              <div className="h-56 relative">
-                <Image
-                  src={getProductImage(p)}
-                  alt={p.label || p.category.label}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 400px"
-                  priority
-                  placeholder="blur"
-                  blurDataURL="data:image/webp;base64,UklGRh4AAABXRUJQVlA4WA=="
-                />
-
-                {/* Title Overlay */}
-                <div className="absolute bottom-0 bg-black/40 text-white px-4 py-3 w-full">
-                  <h3 className="text-xl font-bold">{p.label || p.category.label}</h3>
-                  <p className="text-sm opacity-90">{p.category.unit}</p>
-                </div>
-              </div>
-
-              {/* Card Body */}
-              <div className="p-5 space-y-4">
-                <div className="text-3xl font-bold text-green-600">
-                  ₹{p.pricePerUnit}/<span className="text-lg text-gray-600">{getDisplayUnit(p.category.unit)}</span>
-                </div>
-
-                {/* Quantity Selector */}
-                <div className="flex items-center gap-4">
-                  <button
-                    className="px-3 py-2 bg-gray-200 rounded-xl text-xl"
-                    onClick={() => {
-                      const step = getStep(p.category.unit);
-                      const curr = quantities[p.id] || step;
-                      setQuantities({ ...quantities, [p.id]: Math.max(0, curr - step) });
-                    }}
-                  >
-                    −
-                  </button>
-
-                  <input
-                    type="number"
-                    className="w-20 px-3 py-2 text-center border rounded-xl bg-gray-50 text-lg font-medium"
-                    value={quantities[p.id] || getStep(p.category.unit)}
-                    step={getStep(p.category.unit)}
-                    onChange={(e) =>
-                      setQuantities({
-                        ...quantities,
-                        [p.id]: parseFloat(e.target.value) || getStep(p.category.unit),
-                      })
-                    }
+          {products.map((p) => {
+            const step = getStep(p.category.unit);
+            return (
+              <div key={p.id} className="bg-white rounded-3xl shadow-lg overflow-hidden">
+                {/* Product Image */}
+                <div className="h-56 relative">
+                  <Image
+                    src={getProductImage(p)}
+                    alt={p.label || p.category.label}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 400px"
+                    priority
+                    placeholder="blur"
+                    blurDataURL="data:image/webp;base64,UklGRh4AAABXRUJQVlA4WA=="
                   />
 
+                  {/* Title Overlay */}
+                  <div className="absolute bottom-0 bg-black/40 text-white px-4 py-3 w-full">
+                    <h3 className="text-xl font-bold">{p.label || p.category.label}</h3>
+                    <p className="text-sm opacity-90">{p.category.unit}</p>
+                  </div>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-5 space-y-4">
+                  <div className="text-3xl font-bold text-green-600">
+                    ₹{p.pricePerUnit}/<span className="text-lg text-gray-600">{getDisplayUnit(p.category.unit)}</span>
+                  </div>
+
+                  {/* Quantity Selector - Your Preferred Design + Full 0 Support & Auto Delete */}
+                  {/* Final Quantity Selector - Empty when 0 or deleted */}
+                  <div className="flex items-center justify-center gap-6 bg-gradient-to-r from-pink-50 to-orange-50 rounded-3xl p-5 shadow-inner">
+                    {/* Minus Button */}
+                    <button
+                      onClick={() => {
+                        const step = getStep(p.category.unit);
+                        const current = quantities[p.id] ?? 0;
+                        const newQty = Math.max(0, current - step);
+
+                        if (newQty === 0) {
+                          // Delete entry → input will show empty
+                          const { [p.id]: _, ...rest } = quantities;
+                          setQuantities(rest);
+                        } else {
+                          setQuantities({ ...quantities, [p.id]: newQty });
+                        }
+                      }}
+                      className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center text-3xl font-light text-gray-600 hover:bg-gray-100 active:scale-90 transition-all"
+                    >
+                      −
+                    </button>
+
+                    {/* Quantity Input - Shows empty when no value */}
+                    <div className="flex flex-col items-center">
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={quantities[p.id] ?? ""}  // Empty string when no quantity
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          let value = parseFloat(inputValue);
+
+                          // If empty, NaN, negative, or exactly "0" after parsing → delete it
+                          if (inputValue === "" || isNaN(value) || value < 0 || value === 0) {
+                            const { [p.id]: _, ...rest } = quantities;
+                            setQuantities(rest);
+                          } else {
+                            // Round to 2 decimal places
+                            value = Math.round(value * 100) / 100;
+                            setQuantities({ ...quantities, [p.id]: value });
+                          }
+                        }}
+                        className="w-32 text-center text-4xl font-bold text-gray-800 bg-transparent outline-none placeholder-gray-400 [appearance:textfield] [&::-webkit-outer-spin-button]:hidden [&::-webkit-inner-spin-button]:hidden"
+                        placeholder="0"  // Shows faint "0" only when empty
+                      />
+                      <span className="text-lg font-medium text-gray-600 mt-2">
+                        {getDisplayUnit(p.category.unit)}
+                      </span>
+                    </div>
+
+                    {/* Plus Button */}
+                    <button
+                      onClick={() => {
+                        const step = getStep(p.category.unit);
+                        const current = quantities[p.id] ?? 0;
+                        const newQty = current + step;
+                        setQuantities({ ...quantities, [p.id]: newQty });
+                      }}
+                      className="w-14 h-14 rounded-full bg-gradient-to-r from-pink-600 to-orange-600 shadow-xl flex items-center justify-center text-3xl font-light text-white hover:from-pink-700 hover:to-orange-700 active:scale-90 transition-all"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Total Price */}
+                  <div className="text-lg font-semibold text-gray-800">
+                    Total: <span className="text-pink-600 text-xl">₹{getTotalPrice(p)}</span>
+                  </div>
+
+                  {/* Add to Cart Button */}
                   <button
-                    className="px-3 py-2 bg-gray-200 rounded-xl text-xl"
-                    onClick={() => {
-                      const step = getStep(p.category.unit);
-                      const curr = quantities[p.id] || step;
-                      setQuantities({ ...quantities, [p.id]: curr + step });
-                    }}
+                    onClick={() => addToCart(p)}
+                    disabled={actionLoading === p.id}
+                    className="w-full py-3 bg-gradient-to-r from-pink-600 to-orange-600 text-white rounded-xl font-bold shadow hover:shadow-lg active:scale-95 transition disabled:opacity-70"
                   >
-                    +
+                    {actionLoading === p.id ? (
+                      <span className="flex items-center justify-center gap-3">
+                        <LoadingSpinner /> Adding...
+                      </span>
+                    ) : (
+                      "Add to Cart"
+                    )}
                   </button>
-
-                  <span className="text-lg">{getDisplayUnit(p.category.unit)}</span>
                 </div>
-
-                {/* Total Price */}
-                <div className="text-lg font-semibold text-gray-800">
-                  Total: <span className="text-pink-600 text-xl">₹{getTotalPrice(p)}</span>
-                </div>
-
-                {/* Add to Cart Button */}
-                <button
-                  onClick={() => addToCart(p)}
-                  disabled={actionLoading === p.id}
-                  className="w-full py-3 bg-gradient-to-r from-pink-600 to-orange-600 text-white rounded-xl font-bold shadow hover:shadow-lg active:scale-95 transition disabled:opacity-70"
-                >
-                  {actionLoading === p.id ? (
-                    <span className="flex items-center justify-center gap-3">
-                      <LoadingSpinner /> Adding...
-                    </span>
-                  ) : (
-                    "Add to Cart"
-                  )}
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Toast */}
         {toast.show && (
           <div className="fixed bottom-6 right-6 px-6 py-4 bg-green-600 text-white rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-pulse">
-            <span className="text-2xl">Checkmark</span>
+            <span className="text-2xl">✅</span>
             <span className="font-bold">{toast.msg}</span>
           </div>
         )}

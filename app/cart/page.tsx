@@ -10,7 +10,7 @@ type CartItem = {
   price: number;
   quantity: number;
   total: number;
-  unit: string;      // "kg" | "piece" | "dozen" | "liter" | ...
+  unit: string;
   category: string;
 };
 
@@ -24,20 +24,15 @@ export default function CartPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [showClearAllModal, setShowClearAllModal] = useState(false);
-  const [toast, setToast] = useState<ToastState>({
-    show: false,
-    type: "success",
-    msg: "",
-  });
+  const [toast, setToast] = useState<ToastState>({ show: false, type: "success", msg: "" });
 
   const router = useRouter();
   const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 
   // ---------- helpers ----------
-
   function showToast(type: "success" | "error", msg: string) {
     setToast({ show: true, type, msg });
-    setTimeout(() => setToast({ show: false, type, msg: "" }), 2000);
+    setTimeout(() => setToast({ show: false, type, msg: "" }), 2500);
   }
 
   useEffect(() => {
@@ -48,47 +43,36 @@ export default function CartPage() {
 
   function syncCart(updated: CartItem[]) {
     setCart(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("cart", JSON.stringify(updated));
-    }
+    localStorage.setItem("cart", JSON.stringify(updated));
   }
 
   function getDisplayUnit(unit: string): string {
-    if (unit === "kg") return "kg";
-    if (unit === "piece") return "pcs";
-    if (unit === "dozen") return "dozen";
-    if (unit === "liter") return "L";
-    return unit;
+    return unit === "kg" ? "kg" : unit === "piece" ? "pcs" : unit === "dozen" ? "dozen" : unit;
   }
 
-  function normalizeQuantityForUnit(unit: string, raw: number): number {
-    if (isNaN(raw) || raw < 0) raw = 0;
-
-    if (unit === "kg") {
-      return Number(raw.toFixed(3));
-    }
-
-    // for dozen we still treat quantity as "count", but user changes by 1 dozen (12)
-    if (unit === "dozen") {
-      return Math.round(raw);
-    }
-
-    // piece, liter, etc. → whole numbers
-    return Math.round(raw);
+  function getStep(unit: string): number {
+    return unit === "kg" ? 0.25 : unit === "dozen" ? 1 : 1;
   }
 
-  function updateQuantity(productId: number, newQty: number) {
-    const updated = cart.map((item) => {
-      if (item.id === productId) {
-        const normalized = normalizeQuantityForUnit(item.unit, newQty);
-        return {
-          ...item,
-          quantity: normalized,
-          total: Number((normalized * item.price).toFixed(2)),
-        };
-      }
-      return item;
-    });
+  function updateQuantity(id: number, newValue: string | number) {
+    let qty = typeof newValue === "string" ? parseFloat(newValue) : newValue;
+
+    if (isNaN(qty) || qty < 0) {
+      // Remove item if quantity is 0 or invalid
+      const updated = cart.filter((item) => item.id !== id);
+      syncCart(updated);
+      showToast("success", "Item removed");
+      return;
+    }
+
+    // Round appropriately
+    if (cart.find(item => item.id === id)?.unit === "kg") qty = Math.round(qty * 100) / 100;
+
+    const updated = cart.map((item) =>
+      item.id === id
+        ? { ...item, quantity: qty, total: Number((qty * item.price).toFixed(2)) }
+        : item
+    );
     syncCart(updated);
   }
 
@@ -101,25 +85,15 @@ export default function CartPage() {
   function clearAllItems() {
     syncCart([]);
     setShowClearAllModal(false);
-    showToast("success", "All items removed from cart");
+    showToast("success", "Cart cleared");
   }
 
-  // Format quantity for WhatsApp text
   function formatQuantity(item: CartItem): string {
     const unitLabel = getDisplayUnit(item.unit);
-
-    if (item.unit === "dozen") {
-      // assume quantity here is "dozens"
-      return `${item.quantity} dozen`;
-    }
-
     return `${item.quantity} ${unitLabel}`;
   }
 
-  const grandTotal = cart.reduce(
-    (sum, item) => sum + Number(item.total ?? 0),
-    0
-  );
+  const grandTotal = cart.reduce((sum, item) => sum + item.total, 0);
   const grandTotalDisplay = grandTotal.toFixed(2);
 
   function sendWhatsappOrder() {
@@ -127,208 +101,161 @@ export default function CartPage() {
       showToast("error", "Please enter your name");
       return;
     }
-
     if (cart.length === 0) {
-      showToast("error", "Cart is empty");
+      showToast("error", "Your cart is empty");
       return;
     }
 
     let text = `🍗 VK Proteins Order\n\n`;
-    text += `👤 Customer Name: ${customerName}\n`;
-    text += `📅 Date: ${new Date().toLocaleDateString("en-IN")}\n`;
-    text += `⏰ Time: ${new Date().toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}\n`;
+    text += `👤 Customer: ${customerName}\n`;
+    text += `📅 ${new Date().toLocaleDateString("en-IN")} • ${new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}\n\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    cart.forEach((item, index) => {
-      const unitDisplay = getDisplayUnit(item.unit);
-      text += `${index + 1}. ${item.label}\n`;
-      text += `   Quantity: ${formatQuantity(item)}\n`;
-      text += `   Price: ₹${item.price}/${unitDisplay}\n`;
-      text += `   Total: ₹${item.total.toFixed(2)}\n\n`;
+    cart.forEach((item, i) => {
+      text += `${i + 1}. ${item.label}\n`;
+      text += `   ${formatQuantity(item)} × ₹${item.price} = ₹${item.total.toFixed(2)}\n\n`;
     });
 
     text += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `💰 Grand Total: ₹${grandTotalDisplay}\n`;
-    text += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    text += `Thank you! 🐔 Please confirm delivery address and time.\n`;
-    const encoded = encodeURIComponent(text);
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encoded}`;
+    text += `💰 Grand Total: ₹${grandTotalDisplay}\n\n`;
+    text += `Thank you for choosing VK Proteins! 🐔\nPlease confirm delivery details.`;
+
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");
   }
 
-  // ---------- UI ----------
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-orange-50 to-yellow-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-yellow-50 pb-10">
       {/* HEADER */}
-      <div className="bg-gradient-to-r from-orange-500 via-pink-500 to-yellow-500 text-white shadow-xl p-6 flex justify-between items-center">
-        <button
-          onClick={() => router.push("/user")}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="w-6 h-6" />
-          <span className="font-semibold text-sm">Back</span>
-        </button>
-        <h1 className="text-2xl font-bold">
-          Your Cart ({cart.length} items)
-        </h1>
-        <div className="w-6" />
+      <div className="bg-gradient-to-r from-orange-600 via-pink-600 to-yellow-500 text-white shadow-2xl">
+        <div className="max-w-6xl mx-auto px-6 py-6 flex justify-between items-center">
+          <button onClick={() => router.push("/user")} className="flex items-center gap-3 hover:opacity-90">
+            <ArrowLeft className="w-7 h-7" />
+            <span className="font-bold">Back</span>
+          </button>
+          <h1 className="text-2xl font-extrabold">Your Cart ({cart.length})</h1>
+          <div className="w-10" />
+        </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
-        {/* CLEAR ALL BUTTON */}
+      <div className="max-w-4xl mx-auto px-6 py-10 space-y-8">
+        {/* Clear All */}
         {cart.length > 0 && (
           <div className="flex justify-end">
             <button
               onClick={() => setShowClearAllModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow"
+              className="flex items-center gap-2 px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl shadow-lg font-medium transition"
             >
-              <X className="w-4 h-4" />
-              Clear All Items
+              <Trash2 className="w-5 h-5" />
+              Clear All
             </button>
           </div>
         )}
 
+        {/* Empty Cart */}
         {cart.length === 0 ? (
-          <div className="text-center text-gray-600 py-20 text-lg">
-            Your cart is empty.
+          <div className="text-center py-20">
+            <div className="text-6xl mb-6 opacity-30">🛒</div>
+            <p className="text-xl text-gray-600 mb-8">Your cart is empty</p>
             <button
               onClick={() => router.push("/user")}
-              className="mt-4 block mx-auto px-6 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl"
+              className="px-8 py-4 bg-gradient-to-r from-pink-600 to-orange-600 text-white rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition"
             >
               Continue Shopping
             </button>
           </div>
         ) : (
           <>
+            {/* Cart Items */}
             {cart.map((item) => {
-              const unitLabel = getDisplayUnit(item.unit);
+              const step = getStep(item.unit);
+              const currentQty = item.quantity;
 
               return (
-                <div
-                  key={item.id}
-                  className="bg-white p-6 rounded-3xl shadow-lg space-y-4"
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h2 className="text-xl font-bold">{item.label}</h2>
-                      <p className="text-sm text-gray-500 capitalize">
-                        {item.category} • {unitLabel}
-                      </p>
+                <div key={item.id} className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+                  <div className="p-6 space-y-5">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-800">{item.label}</h2>
+                        <p className="text-gray-500 capitalize">{item.category}</p>
+                      </div>
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        className="text-red-600 hover:text-red-700 p-2"
+                      >
+                        <Trash2 className="w-7 h-7" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="w-6 h-6" />
-                    </button>
-                  </div>
 
-                  {/* Quantity Selector */}
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => {
-                        const step =
-                          item.unit === "kg"
-                            ? 0.25
-                            : item.unit === "dozen"
-                            ? 1
-                            : 1;
-                        const newQty = item.quantity - step;
-                        updateQuantity(item.id, newQty);
-                      }}
-                      className="px-3 py-2 bg-gray-200 rounded-xl text-lg font-bold text-gray-700"
-                    >
-                      –
-                    </button>
+                    {/* Quantity Selector - Matches User Page Style */}
+                    <div className="flex items-center justify-center gap-6 bg-gradient-to-r from-pink-50 to-orange-50 rounded-3xl p-6 shadow-inner">
+                      <button
+                        onClick={() => updateQuantity(item.id, currentQty - step)}
+                        className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center text-3xl font-light text-gray-600 hover:bg-gray-100 active:scale-90 transition"
+                      >
+                        −
+                      </button>
 
-                    <input
-                      type="number"
-                      step={
-                        item.unit === "kg"
-                          ? "0.001"
-                          : item.unit === "dozen"
-                          ? "1"
-                          : "1"
-                      }
-                      min="0"
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const raw = parseFloat(e.target.value);
-                        updateQuantity(item.id, isNaN(raw) ? 0 : raw);
-                      }}
-                      className="w-24 text-center px-3 py-2 border-2 rounded-xl bg-gray-50 text-gray-800 font-semibold"
-                    />
+                      <div className="flex flex-col items-center">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={currentQty > 0 ? currentQty : ""}
+                          onChange={(e) => updateQuantity(item.id, e.target.value)}
+                          placeholder="0"
+                          className="w-32 text-center text-4xl font-bold text-gray-800 bg-transparent outline-none placeholder-gray-400 [appearance:textfield] [&::-webkit-outer-spin-button]:hidden [&::-webkit-inner-spin-button]:hidden"
+                        />
+                        <span className="text-lg font-medium text-gray-600 mt-2">
+                          {getDisplayUnit(item.unit)}
+                        </span>
+                      </div>
 
-                    <button
-                      onClick={() => {
-                        const step =
-                          item.unit === "kg"
-                            ? 0.25
-                            : item.unit === "dozen"
-                            ? 1
-                            : 1;
-                        const newQty = item.quantity + step;
-                        updateQuantity(item.id, newQty);
-                      }}
-                      className="px-3 py-2 bg-gray-200 rounded-xl text-lg font-bold text-gray-700"
-                    >
-                      +
-                    </button>
+                      <button
+                        onClick={() => updateQuantity(item.id, currentQty + step)}
+                        className="w-14 h-14 rounded-full bg-gradient-to-r from-pink-600 to-orange-600 shadow-xl flex items-center justify-center text-3xl font-light text-white hover:from-pink-700 hover:to-orange-700 active:scale-90 transition"
+                      >
+                        +
+                      </button>
+                    </div>
 
-                    <span className="font-medium text-gray-700">
-                      {unitLabel}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-4">
-                    <div>
-                      <span className="text-lg font-semibold text-gray-700">
-                        Price: ₹{item.price} / {unitLabel}
-                      </span>
-                      <div className="text-sm text-gray-500">
-                        Total: {formatQuantity(item)}
+                    <div className="flex justify-between items-center pt-4 border-t-2 border-dashed border-pink-100">
+                      <div>
+                        <p className="text-gray-600">Price per unit</p>
+                        <p className="text-xl font-bold">₹{item.price}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-gray-600">Item Total</p>
+                        <p className="text-3xl font-extrabold text-pink-600">₹{item.total.toFixed(2)}</p>
                       </div>
                     </div>
-                    <span className="text-xl font-bold text-pink-600">
-                      ₹{item.total.toFixed(2)}
-                    </span>
                   </div>
                 </div>
               );
             })}
 
-            {/* NAME INPUT & TOTAL SECTION */}
-            <div className="bg-white rounded-3xl p-6 shadow-xl space-y-4">
-              <label className="text-gray-700 font-semibold">Your Name</label>
+            {/* Customer Name */}
+            <div className="bg-white rounded-3xl shadow-2xl p-6">
+              <label className="block text-lg font-bold text-gray-700 mb-3">Your Name</label>
               <input
                 type="text"
-                placeholder="Enter your name"
+                placeholder="Enter your name for the order"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl"
+                className="w-full px-6 py-4 text-lg border-2 border-pink-200 rounded-2xl focus:border-pink-500 focus:outline-none transition"
               />
             </div>
 
-            <div className="bg-white rounded-3xl shadow-xl p-6 text-center space-y-4">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold">Grand Total</h3>
-                <span className="text-sm text-gray-500">
-                  {cart.length} item{cart.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <p className="text-3xl font-bold text-green-600">
-                ₹{grandTotalDisplay}
-              </p>
+            {/* Grand Total & WhatsApp Button */}
+            <div className="bg-gradient-to-r from-pink-600 to-orange-600 rounded-3xl shadow-2xl p-8 text-white text-center">
+              <p className="text-xl mb-2 opacity-90">{cart.length} item{cart.length > 1 ? "s" : ""}</p>
+              <p className="text-5xl font-extrabold mb-6 drop-shadow-lg">₹{grandTotalDisplay}</p>
 
               <button
                 onClick={sendWhatsappOrder}
-                className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 shadow"
+                className="w-full bg-white text-pink-600 py-5 rounded-2xl font-extrabold text-2xl shadow-xl hover:shadow-2xl active:scale-95 transition flex items-center justify-center gap-4"
               >
-                <Phone className="w-6 h-6" />
+                <Phone className="w-8 h-8" />
                 Send Order on WhatsApp
               </button>
             </div>
@@ -336,25 +263,22 @@ export default function CartPage() {
         )}
       </div>
 
-      {/* CLEAR ALL MODAL */}
+      {/* Clear All Modal */}
       {showClearAllModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full">
-            <h2 className="text-xl font-bold mb-4">Clear All Items?</h2>
-            <p className="mb-6 text-gray-700">
-              Are you sure you want to remove all {cart.length} items from your
-              cart?
-            </p>
-            <div className="flex gap-3">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-4">Clear Cart?</h2>
+            <p className="text-gray-700 mb-8">Remove all {cart.length} items permanently?</p>
+            <div className="flex gap-4">
               <button
                 onClick={clearAllItems}
-                className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold"
+                className="flex-1 bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 transition"
               >
                 Yes, Clear All
               </button>
               <button
                 onClick={() => setShowClearAllModal(false)}
-                className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold"
+                className="flex-1 bg-gray-200 text-gray-800 py-4 rounded-2xl font-bold hover:bg-gray-300 transition"
               >
                 Cancel
               </button>
@@ -363,14 +287,13 @@ export default function CartPage() {
         </div>
       )}
 
-      {/* TOAST */}
+      {/* Toast */}
       {toast.show && (
-        <div
-          className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg text-white flex items-center gap-2 ${
-            toast.type === "success" ? "bg-green-600" : "bg-red-600"
-          }`}
-        >
-          <span className="font-medium text-sm">{toast.msg}</span>
+        <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-4 rounded-2xl shadow-2xl text-white font-bold flex items-center gap-3 z-50 animate-pulse ${
+          toast.type === "success" ? "bg-green-600" : "bg-red-600"
+        }`}>
+          <span>✅</span>
+          <span>{toast.msg}</span>
         </div>
       )}
     </div>

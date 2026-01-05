@@ -23,6 +23,7 @@ export const getProductImage = (product: {
 
     ["prawns", "/images/products/prawns.jpg"],
     ["shrimp", "/images/products/prawns.jpg"],
+    ['skinless',"/images/products/skinless.webp"],
 
     ["mutton leg", "/images/products/mutton-leg.webp"],
     ["boneless", "/images/products/chicken-breast.webp"],

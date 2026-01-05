@@ -28,7 +28,6 @@ type Product = {
   id: number;
   label: string | null;
   name: string;
-  unit: string;
   pricePerUnit: number;
   isActive: boolean;
   categoryId: number;
@@ -127,7 +126,7 @@ export default function AdminClient({
         unit: p.unit || p.category?.unit || "pcs",
       }));
 
-      setProducts(productsWithUnits);
+      setProducts(data);
       return true;
     } catch (error) {
       console.error("Failed to refresh products:", error);
@@ -221,7 +220,7 @@ export default function AdminClient({
     if (!editing) return;
 
     setActionLoading(true);
-
+    console.log("Updating product:", editing);
     try {
       const res = await fetch(`/api/products/${editing.id}`, {
         method: "PUT",
@@ -233,15 +232,17 @@ export default function AdminClient({
         }),
       });
 
+
+
       if (res.ok) {
         showToast("success", "Product updated!");
         setProducts((prev) =>
           prev.map((p) =>
             p.id === editing.id
               ? {
-                  ...editing,
-                  unit: editing.unit || getUnitForCategory(editing.categoryId),
-                }
+                ...editing,
+                unit: editing.unit || getUnitForCategory(editing.categoryId),
+              }
               : p
           )
         );
@@ -374,7 +375,7 @@ export default function AdminClient({
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl shadow-2xl p-2 sm:p-3 flex-shrink-0">
                 <Image
-                  src="/Vk_protein_logo.jpg"
+                  src="/Vk_proteins.png"
                   alt="VK Proteins"
                   width={80}
                   height={80}
@@ -524,7 +525,7 @@ export default function AdminClient({
                       {product.label || product.category?.label}
                     </h3>
                     <p className="text-xs sm:text-sm opacity-90 mt-1">
-                      {product.unit || product.category?.unit || "pcs"} • {product.category?.label}
+                      {product.category.unit}• {product.category?.label}
                     </p>
                   </div>
                 </div>
@@ -539,7 +540,13 @@ export default function AdminClient({
 
                   <div className="grid grid-cols-2 gap-3">
                     <button
-                      onClick={() => setEditing(product)}
+                      onClick={() =>
+                        setEditing({
+                          ...product,
+                          categoryId: 0,       // 👈 reset
+                          category: undefined as any,
+                        })
+                      }
                       className="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg transition text-sm sm:text-base"
                     >
                       <Edit3 className="w-4 h-4" /> Edit
@@ -591,15 +598,30 @@ export default function AdminClient({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category
+                  </label>
+
                   <select
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
-                    value={editing.categoryId}
+                    value={editing.categoryId || 0}
                     onChange={(e) => {
                       const id = Number(e.target.value);
-                      setEditing({ ...editing, categoryId: id, unit: getUnitForCategory(id) });
+
+                      if (id === 0) return;
+
+                      setEditing({
+                        ...editing,
+                        categoryId: id,
+                        category: categories.find((c) => c.id === id)!,
+                      });
                     }}
                   >
+                    {/* 👇 Placeholder */}
+                    <option value={0} disabled>
+                      Select category
+                    </option>
+
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.label} ({c.unit})
@@ -607,6 +629,7 @@ export default function AdminClient({
                     ))}
                   </select>
                 </div>
+
 
                 <div className="flex gap-3 pt-4">
                   <button
@@ -746,9 +769,8 @@ export default function AdminClient({
         {/* TOAST NOTIFICATION */}
         {toast.show && (
           <div
-            className={`fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-auto sm:right-6 px-5 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 text-white ${
-              toast.type === "success" ? "bg-green-600" : "bg-red-600"
-            }`}
+            className={`fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-auto sm:right-6 px-5 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 text-white ${toast.type === "success" ? "bg-green-600" : "bg-red-600"
+              }`}
           >
             {toast.type === "success" ? (
               <CheckCircle className="w-6 h-6 flex-shrink-0" />

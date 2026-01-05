@@ -59,7 +59,7 @@ export default function LoginPage() {
                         <div className="bg-gradient-to-br from-pink-500 via-orange-500 to-yellow-500 py-8 px-6 text-center flex-shrink-0">
                             <div className="inline-flex items-center justify-center w-28 h-28 bg-white rounded-3xl shadow-xl border-4 border-white/50 overflow-hidden">
                                 <img
-                                    src="/Vk_protein_logo.jpg"
+                                    src="/Vk_proteins.png"
                                     alt="VK Proteins"
                                     className="w-full h-full object-cover"
                                 />

@@ -1,8 +1,12 @@
-// /api/products/[id]/route.ts - COMPLETE PRODUCTION READY
+// /api/products/[id]/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 
-// GET SINGLE PRODUCT
+export const dynamic = "force-dynamic";
+
+/* ─────────────────────────────────────────────
+   GET SINGLE PRODUCT
+   ───────────────────────────────────────────── */
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -25,7 +29,6 @@ export async function GET(
         label: true,
         name: true,
         pricePerUnit: true,
-        unit: true,
         isActive: true,
         categoryId: true,
         category: {
@@ -33,33 +36,27 @@ export async function GET(
             id: true,
             label: true,
             value: true,
-            unit: true,
-          }
-        }
+            unit: true, // ✅ ONLY SOURCE OF UNIT
+          },
+        },
       },
     });
 
-    if (!product) {
+    if (!product || !product.isActive) {
       return NextResponse.json(
         { error: "Product not found" },
         { status: 404 }
       );
     }
 
-    // Format response with proper unit
-    const formattedProduct = {
-      ...product,
-      unit: product.unit || product.category?.unit || "pcs",
-      category: product.category ? {
-        ...product.category,
-        unit: product.unit || product.category.unit || "pcs"
-      } : null
-    };
+    return NextResponse.json(product, {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
 
-    return NextResponse.json(formattedProduct);
-
-  } catch (err: any) {
-    console.error("GET Product Error:", err);
+  } catch (error) {
+    console.error("GET Product Error:", error);
     return NextResponse.json(
       { error: "Failed to fetch product" },
       { status: 500 }
@@ -67,7 +64,9 @@ export async function GET(
   }
 }
 
-// UPDATE PRODUCT - OPTIMIZED VERSION
+/* ─────────────────────────────────────────────
+   UPDATE PRODUCT
+   ───────────────────────────────────────────── */
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -85,58 +84,46 @@ export async function PUT(
 
     const data = await req.json();
 
-    // Validate required fields
-    if (!data.label && data.label !== "") {
+    // ── Validation ──
+    if (!data.label || !data.label.trim()) {
       return NextResponse.json(
         { error: "Product name is required" },
         { status: 400 }
       );
     }
 
-    if (!data.pricePerUnit || data.pricePerUnit <= 0) {
+    if (!data.pricePerUnit || Number(data.pricePerUnit) <= 0) {
       return NextResponse.json(
         { error: "Valid price is required" },
         { status: 400 }
       );
     }
 
-    if (!data.categoryId) {
+    const categoryId = Number(data.categoryId);
+    console.log("Category ID:", categoryId);
+    console.log("Data:", data);
+    if (!categoryId || isNaN(categoryId)) {
       return NextResponse.json(
         { error: "Category is required" },
         { status: 400 }
       );
     }
 
-    console.time(`Update Product ${productId}`);
-
-    // Get category unit if not provided
-    if (!data.unit && data.categoryId) {
-      const category = await prisma.category.findUnique({
-        where: { id: data.categoryId },
-        select: { unit: true }
-      });
-      
-      if (category) {
-        data.unit = category.unit;
-      }
-    }
-
+    // ── Update ──
     const product = await prisma.product.update({
       where: { id: productId },
       data: {
-        label: data.label,
-        name: data.label, // Ensure name is synced
-        pricePerUnit: parseFloat(data.pricePerUnit.toFixed(2)),
-        unit: data.unit,
-        categoryId: data.categoryId,
-        ...(data.isActive !== undefined && { isActive: data.isActive })
+        label: data.label.trim(),
+        name: data.label.trim(),
+        pricePerUnit: Number(Number(data.pricePerUnit).toFixed(2)),
+        categoryId,
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
       },
       select: {
         id: true,
         label: true,
         name: true,
         pricePerUnit: true,
-        unit: true,
         isActive: true,
         categoryId: true,
         category: {
@@ -145,25 +132,21 @@ export async function PUT(
             label: true,
             value: true,
             unit: true,
-          }
-        }
+          },
+        },
       },
     });
 
-    console.timeEnd(`Update Product ${productId}`);
+    return NextResponse.json(product, {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
 
-    // Ensure unit is present
-    const formattedProduct = {
-      ...product,
-      unit: product.unit || product.category?.unit || "pcs"
-    };
+  } catch (error: any) {
+    console.error("Update Error:", error);
 
-    return NextResponse.json(formattedProduct);
-
-  } catch (err: any) {
-    console.error("Update Error:", err);
-
-    if (err.code === 'P2025') {
+    if (error.code === "P2025") {
       return NextResponse.json(
         { error: "Product not found" },
         { status: 404 }
@@ -177,17 +160,17 @@ export async function PUT(
   }
 }
 
-// DELETE PRODUCT - PRODUCTION OPTIMIZED
+/* ─────────────────────────────────────────────
+   DELETE PRODUCT (SOFT DELETE)
+   ───────────────────────────────────────────── */
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // ✅ CRITICAL: Await params first
     const { id } = await params;
     const productId = Number(id);
 
-    // Early validation
     if (!productId || isNaN(productId)) {
       return NextResponse.json(
         { error: "Invalid product ID" },
@@ -195,41 +178,27 @@ export async function DELETE(
       );
     }
 
-    console.time(`Delete Product ${productId}`);
-
-    // ✅ Add timeout for safety
-    const deletePromise = prisma.product.delete({
+    await prisma.product.update({
       where: { id: productId },
+      data: { isActive: false }, // ✅ SOFT DELETE
     });
 
-    // Timeout after 3 seconds (faster for production)
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Delete timeout")), 3000)
+    return NextResponse.json(
+      { success: true, message: "Product deleted successfully" },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
     );
 
-    await Promise.race([deletePromise, timeoutPromise]);
+  } catch (error: any) {
+    console.error("Delete Error:", error);
 
-    console.timeEnd(`Delete Product ${productId}`);
-
-    return NextResponse.json({
-      success: true,
-      message: "Product deleted successfully"
-    });
-
-  } catch (err: any) {
-    console.error("Delete Error:", err);
-
-    if (err.code === 'P2025') {
+    if (error.code === "P2025") {
       return NextResponse.json(
         { error: "Product not found" },
         { status: 404 }
-      );
-    }
-
-    if (err.message === "Delete timeout") {
-      return NextResponse.json(
-        { error: "Delete operation timed out. Please try again." },
-        { status: 504 }
       );
     }
 
