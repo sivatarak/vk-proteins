@@ -241,7 +241,7 @@ export default function AdminClient({
             p.id === editing.id
               ? {
                 ...editing,
-                unit: editing.unit || getUnitForCategory(editing.categoryId),
+                unit: editing.pricePerUnit || getUnitForCategory(editing.categoryId),
               }
               : p
           )
@@ -534,7 +534,7 @@ export default function AdminClient({
                   <div className="text-2xl sm:text-3xl font-extrabold text-green-600">
                     ₹{product.pricePerUnit.toFixed(2)}
                     <span className="text-base sm:text-lg text-gray-600">
-                      /{product.unit || product.category?.unit || "pcs"}
+                      /{product.pricePerUnit || product.category?.unit || "pcs"}
                     </span>
                   </div>
 
